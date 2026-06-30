@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      # TODO: Add hash
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        # TODO: Add hash
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Lint
+        run: uv run ruff check src/ tests/
+
+      - name: Format
+        run: uv run ruff format --check src/ tests/
+
+      - name: Type check
+        run: uv run ty check src/
+
+      - name: Test with coverage
+        run: uv run pytest tests/ -v --cov=heartbeat --cov-report=term-missing
