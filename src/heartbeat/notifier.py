@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 import os
 from typing import Any
@@ -20,12 +18,15 @@ _STATUS_EMOJI = {
 
 
 class SlackNotifier:
-    def __init__(self, webhook_url: str, client: httpx.AsyncClient | None = None) -> None:
+    def __init__(self, webhook_url: "str", client: "httpx.AsyncClient | None" = None) -> None:
         self._webhook_url = webhook_url
         self._client = client
         self._owns_client = client is None
 
-    async def send(self, payload: AlertPayload) -> bool:
+    async def send(self, payload: "AlertPayload") -> "bool":
+        """
+        sends a notification to the Slack webhook with the given alert payload.
+        """
         client = self._client or httpx.AsyncClient()
         try:
             message = _build_message(payload)
@@ -42,7 +43,11 @@ class SlackNotifier:
                 await client.aclose()
 
 
-def _build_message(payload: AlertPayload) -> dict[str, Any]:
+def _build_message(payload: "AlertPayload") -> "dict[str, Any]":
+    """
+    builds a Slack message payload from the given alert payload, including the
+    alert state, summary, and details of each service result.
+    """
     is_firing = payload.state == AlertState.FIRING
     color = "#EE0000" if is_firing else "#36A64F"
     firing_count = sum(1 for r in payload.results if not r.is_healthy)
@@ -52,7 +57,7 @@ def _build_message(payload: AlertPayload) -> dict[str, Any]:
     else:
         header = ":white_check_mark: [RESOLVED] Heartbeat"
 
-    blocks: list[dict[str, Any]] = [
+    blocks: "list[dict[str, Any]]" = [
         {"type": "header", "text": {"type": "plain_text", "text": header}},
         {
             "type": "section",
@@ -73,13 +78,17 @@ def _build_message(payload: AlertPayload) -> dict[str, Any]:
     return {"attachments": [{"color": color, "blocks": blocks}]}
 
 
-def _build_service_blocks(result: HealthResult) -> list[dict[str, Any]]:
+def _build_service_blocks(result: "HealthResult") -> "list[dict[str, Any]]":
+    """
+    builds Slack message blocks for a single service health result, including the
+    service name, status, response time, and any error messages.
+    """
     emoji = _STATUS_EMOJI.get(result.status, ":question:")
     status_text = f"{emoji} {result.status.value.upper()}"
     if result.status_code is not None:
         status_text += f" (HTTP {result.status_code})"
 
-    fields: list[dict[str, Any]] = [
+    fields: "list[dict[str, Any]]" = [
         {"type": "mrkdwn", "text": f"*Service:*\n{result.service.name}"},
         {"type": "mrkdwn", "text": f"*Status:*\n{status_text}"},
     ]
@@ -99,7 +108,11 @@ def _build_service_blocks(result: HealthResult) -> list[dict[str, Any]]:
     ]
 
 
-def _build_footer(payload: AlertPayload) -> dict[str, Any]:
+def _build_footer(payload: "AlertPayload") -> "dict[str, Any]":
+    """
+    builds a Slack message footer block with the timestamp of the alert and a link to the
+    GitHub Actions run that triggered the alert, if available.
+    """
     ts = payload.timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
     parts = [f":clock1: {ts}"]
 

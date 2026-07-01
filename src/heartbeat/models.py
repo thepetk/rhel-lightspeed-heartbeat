@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
@@ -21,29 +19,29 @@ class AlertState(Enum):
 
 @dataclass(frozen=True)
 class ServiceConfig:
-    name: str
-    url: str
-    health_path: str = "/healthz"
-    timeout_seconds: float = 10.0
-    expected_status_codes: tuple[int, ...] = (200,)
-    response_time_threshold_ms: float | None = None
+    name: "str"
+    url: "str"
+    health_path: "str" = "/healthz"
+    timeout_seconds: "float" = 10.0
+    expected_status_codes: "tuple[int, ...]" = (200,)
+    response_time_threshold_ms: "float | None" = None
 
 
 @dataclass(frozen=True)
 class HealthResult:
-    service: ServiceConfig
-    status: HealthStatus
-    status_code: int | None = None
-    response_time_ms: float | None = None
-    error_message: str | None = None
-    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    service: "ServiceConfig"
+    status: "HealthStatus"
+    status_code: "int | None" = None
+    response_time_ms: "float | None" = None
+    error_message: "str | None" = None
+    timestamp: "datetime" = field(default_factory=lambda: datetime.now(UTC))
 
     @property
-    def is_healthy(self) -> bool:
+    def is_healthy(self) -> "bool":
         return self.status == HealthStatus.HEALTHY
 
     @property
-    def is_ok(self) -> bool:
+    def is_ok(self) -> "bool":
         """
         True if the service is reachable, even if degraded.
         """
@@ -52,7 +50,7 @@ class HealthResult:
 
 @dataclass(frozen=True)
 class AlertPayload:
-    state: AlertState
-    results: tuple[HealthResult, ...]
-    summary: str
-    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    state: "AlertState"
+    results: "tuple[HealthResult, ...]"
+    summary: "str"
+    timestamp: "datetime" = field(default_factory=lambda: datetime.now(UTC))

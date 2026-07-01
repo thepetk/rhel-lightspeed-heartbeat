@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 import time
 from collections.abc import Sequence
@@ -11,11 +9,15 @@ from heartbeat.models import HealthResult, HealthStatus, ServiceConfig
 
 
 class HealthChecker:
-    def __init__(self, client: httpx.AsyncClient | None = None) -> None:
+    def __init__(self, client: "httpx.AsyncClient | None" = None) -> "None":
         self._client = client
         self._owns_client = client is None
 
-    async def check(self, service: ServiceConfig) -> HealthResult:
+    async def check(self, service: "ServiceConfig") -> "HealthResult":
+        """
+        checks the health of a service by sending an HTTP GET request to its
+        health endpoint and measuring the response time.
+        """
         assert self._client is not None, "HealthChecker must be used as an async context manager"
         url = f"{service.url.rstrip('/')}{service.health_path}"
         start = time.monotonic()
@@ -63,15 +65,15 @@ class HealthChecker:
                 error_message=str(e),
             )
 
-    async def check_all(self, services: Sequence[ServiceConfig]) -> list[HealthResult]:
+    async def check_all(self, services: "Sequence[ServiceConfig]") -> "list[HealthResult]":
         return list(await asyncio.gather(*[self.check(s) for s in services]))
 
-    async def __aenter__(self) -> Self:
+    async def __aenter__(self) -> "Self":
         if self._owns_client:
             self._client = httpx.AsyncClient()
         return self
 
-    async def __aexit__(self, *_: object) -> None:
+    async def __aexit__(self, *_: "object") -> None:
         if self._owns_client and self._client is not None:
             await self._client.aclose()
             self._client = None

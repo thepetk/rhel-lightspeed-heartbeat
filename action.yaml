@@ -5,7 +5,7 @@ author: "thepetk"
 inputs:
   services:
     description: >
-      JSON array of services to probe. Each object must have "name" and "url" fields.
+      YAML sequence of services to probe. Each entry must have "name" and "url" fields.
       Optional fields: "health_path" (default: "/healthz"), "timeout_seconds" (default: 10),
       "expected_status_codes" (default: [200]), "response_time_threshold_ms" (omit to skip threshold check).
     required: true

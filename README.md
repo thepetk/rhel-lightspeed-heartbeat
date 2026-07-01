@@ -10,11 +10,14 @@ A GitHub Action that probes service health endpoints concurrently and sends Slac
 - uses: thepetk/rhel-lightspeed-heartbeat@main
   with:
     services: |
-      [
-        {"name": "api", "url": "https://api.example.com"},
-        {"name": "gateway", "url": "https://gateway.example.com", "health_path": "/health"},
-        {"name": "backend", "url": "https://backend.example.com", "response_time_threshold_ms": 2000}
-      ]
+      - name: api
+        url: https://api.example.com
+      - name: gateway
+        url: https://gateway.example.com
+        health_path: /health
+      - name: backend
+        url: https://backend.example.com
+        response_time_threshold_ms: 2000
     slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
 ```
 
@@ -24,7 +27,9 @@ A GitHub Action that probes service health endpoints concurrently and sends Slac
 - id: heartbeat
   uses: thepetk/rhel-lightspeed-heartbeat@main
   with:
-    services: '[{"name": "api", "url": "https://api.example.com"}]'
+    services: |
+      - name: api
+        url: https://api.example.com
     fail_on_unhealthy: "false"
 
 - run: echo "All healthy? ${{ steps.heartbeat.outputs.healthy }}"
@@ -34,7 +39,11 @@ A GitHub Action that probes service health endpoints concurrently and sends Slac
 ### Run locally
 
 ```bash
-export HEARTBEAT_SERVICES_JSON='[{"name": "httpbin", "url": "https://httpbin.org", "health_path": "/status/200"}]'
+export HEARTBEAT_SERVICES='
+- name: httpbin
+  url: https://httpbin.org
+  health_path: /status/200
+'
 # Optional:
 export HEARTBEAT_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 
@@ -47,7 +56,7 @@ uv run python -m heartbeat
 
 | Input               | Required | Default  | Description                                                    |
 | ------------------- | -------- | -------- | -------------------------------------------------------------- |
-| `services`          | Yes      | —        | JSON array of service definitions (see format below)           |
+| `services`          | Yes      | —        | YAML sequence of service definitions (see format below)        |
 | `slack_webhook_url` | No       | `""`     | Slack incoming webhook URL for failure notifications           |
 | `timeout`           | No       | `"10"`   | Default HTTP probe timeout in seconds                          |
 | `fail_on_unhealthy` | No       | `"true"` | Exit with failure code if any service is unhealthy or degraded |
@@ -59,9 +68,9 @@ uv run python -m heartbeat
 | `healthy` | `"true"` / `"false"` | Whether all services are healthy (HEALTHY or DEGRADED counts as ok) |
 | `results` | JSON string          | Array of per-service check results                                  |
 
-### Services JSON Format
+### Services YAML Format
 
-Each service object in the `services` array supports:
+Each service entry in the `services` sequence supports:
 
 | Field                        | Required | Default      | Description                                            |
 | ---------------------------- | -------- | ------------ | ------------------------------------------------------ |
@@ -76,7 +85,7 @@ Each service object in the `services` array supports:
 
 | Variable                      | Description                     |
 | ----------------------------- | ------------------------------- |
-| `HEARTBEAT_SERVICES_JSON`     | Same format as `services` input |
+| `HEARTBEAT_SERVICES`          | Same format as `services` input |
 | `HEARTBEAT_SLACK_WEBHOOK_URL` | Slack webhook URL               |
 | `HEARTBEAT_TIMEOUT`           | Default timeout in seconds      |
 | `HEARTBEAT_FAIL_ON_UNHEALTHY` | `"true"` / `"false"`            |
@@ -134,15 +143,15 @@ make install
 
 ### Make Targets
 
-| Target            | Description                                                |
-| ----------------- | ---------------------------------------------------------- |
-| `make install`    | Install dependencies with uv                               |
-| `make lint`       | Run ruff linter                                            |
-| `make format`     | Check formatting with ruff                                 |
-| `make format-fix` | Auto-fix formatting                                        |
-| `make type-check` | Run ty type checker                                        |
-| `make test`       | Run tests                                                  |
-| `make test-cov`   | Run tests with coverage report                             |
-| `make run`        | Run heartbeat locally (requires `HEARTBEAT_SERVICES_JSON`) |
-| `make check`      | Run all checks (lint, format, types, tests with coverage)  |
-| `make clean`      | Remove build artifacts and caches                          |
+| Target            | Description                                               |
+| ----------------- | --------------------------------------------------------- |
+| `make install`    | Install dependencies with uv                              |
+| `make lint`       | Run ruff linter                                           |
+| `make format`     | Check formatting with ruff                                |
+| `make format-fix` | Auto-fix formatting                                       |
+| `make type-check` | Run ty type checker                                       |
+| `make test`       | Run tests                                                 |
+| `make test-cov`   | Run tests with coverage report                            |
+| `make run`        | Run heartbeat locally (requires `HEARTBEAT_SERVICES`)     |
+| `make check`      | Run all checks (lint, format, types, tests with coverage) |
+| `make clean`      | Remove build artifacts and caches                         |

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import os
 import sys
@@ -19,10 +17,14 @@ _STATUS_ICON = {
 
 
 class HeartbeatRunner:
-    def __init__(self, config: HeartbeatConfig) -> None:
+    def __init__(self, config: "HeartbeatConfig") -> None:
         self._config = config
 
-    async def run(self) -> list[HealthResult]:
+    async def run(self) -> "list[HealthResult]":
+        """
+        runs the health checks for all configured services, prints the results,
+        sets GitHub Actions outputs, and sends notifications if any services are unhealthy.
+        """
         async with HealthChecker() as checker:
             results = await checker.check_all(self._config.services)
 
@@ -35,7 +37,10 @@ class HeartbeatRunner:
 
         return results
 
-    async def _notify(self, results: list[HealthResult]) -> None:
+    async def _notify(self, results: "list[HealthResult]") -> None:
+        """
+        notifies via Slack if any services are unhealthy or degraded, summarizing the results.
+        """
         if not self._config.slack_webhook_url:
             return
         unhealthy_count = sum(1 for r in results if not r.is_ok)
@@ -55,7 +60,11 @@ class HeartbeatRunner:
         notifier = SlackNotifier(self._config.slack_webhook_url)
         await notifier.send(payload)
 
-    def _print_results(self, results: list[HealthResult]) -> None:
+    def _print_results(self, results: "list[HealthResult]") -> None:
+        """
+        simply prints the health check results to the console in a tabular format, including service name,
+        status, HTTP code, and response time.
+        """
         print(f"\n{'Service':<30} {'Status':<12} {'Code':<6} {'Time (ms)':<12}")
         print("-" * 65)
         for r in results:
@@ -73,7 +82,11 @@ class HeartbeatRunner:
             elif r.status == HealthStatus.DEGRADED:
                 print(f"::warning::Service '{r.service.name}' is DEGRADED", file=sys.stderr)
 
-    def _set_github_output(self, results: list[HealthResult]) -> None:
+    def _set_github_output(self, results: "list[HealthResult]") -> None:
+        """
+        sets GitHub Actions outputs for the overall health status and detailed results in JSON format,
+        which can be used in subsequent steps of the workflow.
+        """
         output_file = os.environ.get("GITHUB_OUTPUT")
         if not output_file:
             return

@@ -1,36 +1,35 @@
-from __future__ import annotations
-
-import json
 import os
 from dataclasses import dataclass
 from typing import Any, cast
+
+import yaml
 
 from heartbeat.models import ServiceConfig
 
 
 @dataclass
 class HeartbeatConfig:
-    services: list[ServiceConfig]
-    slack_webhook_url: str | None = None
-    default_timeout: float = 10.0
-    fail_on_unhealthy: bool = True
+    services: "list[ServiceConfig]"
+    slack_webhook_url: "str | None" = None
+    default_timeout: "float" = 10.0
+    fail_on_unhealthy: "bool" = True
 
     @classmethod
-    def from_env(cls) -> HeartbeatConfig:
+    def from_env(cls) -> "HeartbeatConfig":
         """
         fetches configuration from environment variables. It looks for the following variables:
-        - `INPUT_SERVICES` or `HEARTBEAT_SERVICES_JSON`: JSON array of service definitions.
+        - `INPUT_SERVICES` or `HEARTBEAT_SERVICES`: YAML sequence of service definitions.
         """
 
         # fetch services configuration from environment variables
-        services_json = os.environ.get("INPUT_SERVICES") or os.environ.get("HEARTBEAT_SERVICES_JSON")
-        if not services_json:
+        services_yaml = os.environ.get("INPUT_SERVICES") or os.environ.get("HEARTBEAT_SERVICES")
+        if not services_yaml:
             raise ValueError(
-                "No services configured. Set INPUT_SERVICES or HEARTBEAT_SERVICES_JSON "
-                "to a JSON array of service definitions."
+                "No services configured. Set INPUT_SERVICES or HEARTBEAT_SERVICES "
+                "to a YAML sequence of service definitions."
             )
 
-        services = _parse_services(services_json)
+        services = _parse_services(services_yaml)
 
         # fetch optional slack webhook url from environment variables
         slack_webhook_url = os.environ.get("INPUT_SLACK_WEBHOOK_URL") or os.environ.get("HEARTBEAT_SLACK_WEBHOOK_URL")
@@ -51,10 +50,10 @@ class HeartbeatConfig:
         )
 
 
-def _parse_services(services_json: str) -> list[ServiceConfig]:
+def _parse_services(services_yaml: "str") -> "list[ServiceConfig]":
     """
-    parses the services configuration from a JSON string.
-    The expected format is a JSON array of objects, each containing:
+    parses the services configuration from a YAML string.
+    The expected format is a YAML sequence of mappings, each containing:
     - `name`: The name of the service (string, required).
     - `url`: The base URL of the service (string, required).
     - `health_path`: The path to the health endpoint (string, optional, default: "/healthz").
@@ -63,17 +62,17 @@ def _parse_services(services_json: str) -> list[ServiceConfig]:
     - `response_time_threshold_ms`: The response time threshold in milliseconds (float, optional).
     """
     try:
-        raw = json.loads(services_json)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON in services configuration: {e}") from e
+        raw = yaml.safe_load(services_yaml)
+    except yaml.YAMLError as e:
+        raise ValueError(f"Invalid YAML in services configuration: {e}") from e
 
     if not isinstance(raw, list):
-        raise ValueError("Services configuration must be a JSON array.")
+        raise ValueError("Services configuration must be a YAML sequence.")
 
     services = []
     for i, entry in enumerate(raw):
         if not isinstance(entry, dict):
-            raise ValueError(f"Service at index {i} must be a JSON object.")
+            raise ValueError(f"Service at index {i} must be a YAML mapping.")
         item = cast(dict[str, Any], entry)
         if "name" not in item:
             raise ValueError(f"Service at index {i} is missing required field 'name'.")
