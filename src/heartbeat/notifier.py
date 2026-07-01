@@ -48,9 +48,9 @@ def _build_message(payload: AlertPayload) -> dict[str, Any]:
     firing_count = sum(1 for r in payload.results if not r.is_healthy)
 
     if is_firing:
-        header = f":rotating_light: [FIRING:{firing_count}] RHEL Lightspeed Heartbeat"
+        header = f":rotating_light: [FIRING:{firing_count}] Heartbeat"
     else:
-        header = ":white_check_mark: [RESOLVED] RHEL Lightspeed Heartbeat"
+        header = ":white_check_mark: [RESOLVED] Heartbeat"
 
     blocks: list[dict[str, Any]] = [
         {"type": "header", "text": {"type": "plain_text", "text": header}},

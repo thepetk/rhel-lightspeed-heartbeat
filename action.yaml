@@ -1,0 +1,52 @@
+name: "Heartbeat"
+description: "Health check probe for services with Slack alerting"
+author: "thepetk"
+
+inputs:
+  services:
+    description: >
+      JSON array of services to probe. Each object must have "name" and "url" fields.
+      Optional fields: "health_path" (default: "/healthz"), "timeout_seconds" (default: 10),
+      "expected_status_codes" (default: [200]), "response_time_threshold_ms" (omit to skip threshold check).
+    required: true
+  slack_webhook_url:
+    description: "Slack incoming webhook URL for failure notifications."
+    required: false
+    default: ""
+  timeout:
+    description: "Default HTTP probe timeout in seconds."
+    required: false
+    default: "10"
+  fail_on_unhealthy:
+    description: "Exit with failure code if any service is unhealthy or degraded."
+    required: false
+    default: "true"
+
+outputs:
+  results:
+    description: "JSON array of health check results."
+    value: ${{ steps.heartbeat.outputs.results }}
+  healthy:
+    description: "Whether all services are healthy (true/false)."
+    value: ${{ steps.heartbeat.outputs.healthy }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install uv
+      # TODO: Add hash
+      uses: astral-sh/setup-uv@v6
+      with:
+        version: "latest"
+
+    - name: Run heartbeat checks
+      id: heartbeat
+      shell: bash
+      env:
+        INPUT_SERVICES: ${{ inputs.services }}
+        INPUT_SLACK_WEBHOOK_URL: ${{ inputs.slack_webhook_url }}
+        INPUT_TIMEOUT: ${{ inputs.timeout }}
+        INPUT_FAIL_ON_UNHEALTHY: ${{ inputs.fail_on_unhealthy }}
+      run: |
+        cd ${{ github.action_path }}
+        uv run python -m heartbeat

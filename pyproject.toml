@@ -1,11 +1,11 @@
 [project]
-name = "rhel-lightspeed-heartbeat"
+name = "heartbeat"
 version = "0.1.0"
-description = "Health check and heartbeat tool for RHEL Lightspeed stack services"
+description = "Health check probe for services with Slack alerting"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.13"
-authors = [{ name = "RHEL Lightspeed Team" }]
+authors = [{ name = "thepetk" }]
 dependencies = ["httpx>=0.28"]
 
 [project.scripts]
