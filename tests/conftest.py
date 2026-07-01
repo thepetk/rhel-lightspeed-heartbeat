@@ -3,6 +3,17 @@ import pytest
 from heartbeat.models import AlertPayload, AlertState, HealthResult, HealthStatus, ServiceConfig
 
 
+@pytest.fixture(autouse=True)
+def mock_asyncio_sleep(monkeypatch):
+    sleep_calls: list[float] = []
+
+    async def fake_sleep(delay: float) -> None:
+        sleep_calls.append(delay)
+
+    monkeypatch.setattr("heartbeat.checker.asyncio.sleep", fake_sleep)
+    return sleep_calls
+
+
 @pytest.fixture
 def service() -> "ServiceConfig":
     return ServiceConfig(name="rlsapi", url="https://api.example.com", health_path="/healthz")

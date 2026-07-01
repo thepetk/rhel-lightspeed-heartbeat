@@ -7,7 +7,7 @@ A GitHub Action that probes service health endpoints concurrently and sends Slac
 ### As a GitHub Action
 
 ```yaml
-- uses: thepetk/rhel-lightspeed-heartbeat@main
+- uses: thepetk/heartbeat@main
   with:
     services: |
       - name: api
@@ -25,7 +25,7 @@ A GitHub Action that probes service health endpoints concurrently and sends Slac
 
 ```yaml
 - id: heartbeat
-  uses: thepetk/rhel-lightspeed-heartbeat@main
+  uses: thepetk/heartbeat@main
   with:
     services: |
       - name: api
@@ -54,12 +54,14 @@ uv run python -m heartbeat
 
 ### Action Inputs
 
-| Input               | Required | Default  | Description                                                    |
-| ------------------- | -------- | -------- | -------------------------------------------------------------- |
-| `services`          | Yes      | —        | YAML sequence of service definitions (see format below)        |
-| `slack_webhook_url` | No       | `""`     | Slack incoming webhook URL for failure notifications           |
-| `timeout`           | No       | `"10"`   | Default HTTP probe timeout in seconds                          |
-| `fail_on_unhealthy` | No       | `"true"` | Exit with failure code if any service is unhealthy or degraded |
+| Input                   | Required | Default  | Description                                                    |
+| ----------------------- | -------- | -------- | -------------------------------------------------------------- |
+| `services`              | Yes      | —        | YAML sequence of service definitions (see format below)        |
+| `slack_webhook_url`     | No       | `""`     | Slack incoming webhook URL for failure notifications           |
+| `timeout`               | No       | `"10"`   | Default HTTP probe timeout in seconds                          |
+| `fail_on_unhealthy`     | No       | `"true"` | Exit with failure code if any service is unhealthy or degraded |
+| `retry_count`           | No       | `"5"`    | Number of retries per service before marking it as failed      |
+| `backoff_base_seconds`  | No       | `"1.0"`  | Base delay in seconds for exponential backoff between retries  |
 
 ### Action Outputs
 
@@ -136,8 +138,8 @@ Service: backend      Status: ⚠ DEGRADED (HTTP 200)
 ### Setup
 
 ```bash
-git clone https://github.com/thepetk/rhel-lightspeed-heartbeat
-cd rhel-lightspeed-heartbeat
+git clone https://github.com/thepetk/heartbeat
+cd heartbeat
 make install
 ```
 

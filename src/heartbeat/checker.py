@@ -15,9 +15,18 @@ class HealthChecker:
 
     async def check(self, service: "ServiceConfig") -> "HealthResult":
         """
-        checks the health of a service by sending an HTTP GET request to its
-        health endpoint and measuring the response time.
+        checks the health of a service, retrying up to service.retry_count times
+        with exponential backoff on any non-HEALTHY result.
         """
+        result = await self._check_once(service)
+        for attempt in range(service.retry_count):
+            if result.status == HealthStatus.HEALTHY:
+                return result
+            await asyncio.sleep(service.backoff_base_seconds * (2**attempt))
+            result = await self._check_once(service)
+        return result
+
+    async def _check_once(self, service: "ServiceConfig") -> "HealthResult":
         assert self._client is not None, "HealthChecker must be used as an async context manager"
         url = f"{service.url.rstrip('/')}{service.health_path}"
         start = time.monotonic()

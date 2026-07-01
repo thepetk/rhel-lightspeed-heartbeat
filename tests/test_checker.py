@@ -93,6 +93,81 @@ async def test_check_all_concurrent():
 
 
 @respx.mock
+async def test_check_no_retry_on_healthy(service, mock_asyncio_sleep):
+    respx.get("https://api.example.com/healthz").mock(return_value=httpx.Response(200))
+    async with HealthChecker() as checker:
+        result = await checker.check(service)
+    assert result.status == HealthStatus.HEALTHY
+    assert mock_asyncio_sleep == []
+
+
+@respx.mock
+async def test_check_retries_on_unhealthy_then_healthy(mock_asyncio_sleep):
+    svc = ServiceConfig(name="svc", url="https://api.example.com", health_path="/healthz", retry_count=2, backoff_base_seconds=1.0)
+    responses = iter([httpx.Response(503), httpx.Response(200)])
+    respx.get("https://api.example.com/healthz").mock(side_effect=lambda _: next(responses))
+    async with HealthChecker() as checker:
+        result = await checker.check(svc)
+    assert result.status == HealthStatus.HEALTHY
+    assert mock_asyncio_sleep == [1.0]  # 1.0 * 2^0
+
+
+@respx.mock
+async def test_check_retries_exhausted_returns_last_failure(mock_asyncio_sleep):
+    svc = ServiceConfig(name="svc", url="https://api.example.com", health_path="/healthz", retry_count=3, backoff_base_seconds=1.0)
+    respx.get("https://api.example.com/healthz").mock(return_value=httpx.Response(503))
+    async with HealthChecker() as checker:
+        result = await checker.check(svc)
+    assert result.status == HealthStatus.UNHEALTHY
+    assert mock_asyncio_sleep == [1.0, 2.0, 4.0]  # 1.0 * 2^0, 2^1, 2^2
+
+
+@respx.mock
+async def test_check_zero_retries_no_sleep(mock_asyncio_sleep):
+    svc = ServiceConfig(name="svc", url="https://api.example.com", health_path="/healthz", retry_count=0)
+    respx.get("https://api.example.com/healthz").mock(return_value=httpx.Response(503))
+    async with HealthChecker() as checker:
+        result = await checker.check(svc)
+    assert result.status == HealthStatus.UNHEALTHY
+    assert mock_asyncio_sleep == []
+
+
+@respx.mock
+async def test_check_retries_on_degraded(mock_asyncio_sleep, monkeypatch):
+    svc = ServiceConfig(
+        name="svc", url="https://api.example.com", health_path="/healthz",
+        retry_count=2, backoff_base_seconds=2.0, response_time_threshold_ms=1,
+    )
+    respx.get("https://api.example.com/healthz").mock(return_value=httpx.Response(200))
+
+    # odd calls = start timestamp, even calls = start + 1s → always 1000ms elapsed > 1ms threshold
+    import heartbeat.checker as checker_mod
+    call_count = [0]
+    original_monotonic = checker_mod.time.monotonic
+
+    def fake_monotonic():
+        val = original_monotonic()
+        call_count[0] += 1
+        return val + 1.0 if call_count[0] % 2 == 0 else val
+
+    monkeypatch.setattr("heartbeat.checker.time.monotonic", fake_monotonic)
+    async with HealthChecker() as checker:
+        result = await checker.check(svc)
+
+    assert result.status == HealthStatus.DEGRADED
+    assert len(mock_asyncio_sleep) == 2  # retried twice (retry_count=2)
+
+
+@respx.mock
+async def test_check_backoff_uses_custom_base(mock_asyncio_sleep):
+    svc = ServiceConfig(name="svc", url="https://api.example.com", health_path="/healthz", retry_count=3, backoff_base_seconds=0.5)
+    respx.get("https://api.example.com/healthz").mock(return_value=httpx.Response(503))
+    async with HealthChecker() as checker:
+        await checker.check(svc)
+    assert mock_asyncio_sleep == [0.5, 1.0, 2.0]  # 0.5 * 2^0, 2^1, 2^2
+
+
+@respx.mock
 async def test_check_with_injected_client(service):
     respx.get("https://api.example.com/healthz").mock(return_value=httpx.Response(200))
     async with httpx.AsyncClient() as client:
@@ -113,9 +188,7 @@ async def test_check_degraded_when_threshold_exceeded(service_with_threshold, mo
     def fake_monotonic():
         val = original_monotonic()
         calls.append(val)
-        if len(calls) == 1:
-            return val
-        return val + 1.0  # simulate 1000ms elapsed
+        return val + 1.0 if len(calls) % 2 == 0 else val
 
     monkeypatch.setattr("heartbeat.checker.time.monotonic", fake_monotonic)
     async with HealthChecker() as checker:

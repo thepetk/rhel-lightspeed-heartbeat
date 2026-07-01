@@ -13,7 +13,7 @@ from heartbeat.runner import HeartbeatRunner
 
 def make_config(slack_url: str | None = None, fail_on_unhealthy: bool = True) -> HeartbeatConfig:
     return HeartbeatConfig(
-        services=[ServiceConfig(name="rlsapi", url="https://api.example.com", health_path="/healthz")],
+        services=[ServiceConfig(name="rlsapi", url="https://api.example.com", health_path="/healthz", retry_count=0)],
         slack_webhook_url=slack_url,
         fail_on_unhealthy=fail_on_unhealthy,
     )

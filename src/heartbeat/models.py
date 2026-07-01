@@ -25,6 +25,8 @@ class ServiceConfig:
     timeout_seconds: "float" = 10.0
     expected_status_codes: "tuple[int, ...]" = (200,)
     response_time_threshold_ms: "float | None" = None
+    retry_count: "int" = 5
+    backoff_base_seconds: "float" = 1.0
 
 
 @dataclass(frozen=True)

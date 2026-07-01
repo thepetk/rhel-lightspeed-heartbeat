@@ -21,6 +21,14 @@ inputs:
     description: "Exit with failure code if any service is unhealthy or degraded."
     required: false
     default: "true"
+  retry_count:
+    description: "Number of retries per service before marking it as failed."
+    required: false
+    default: "5"
+  backoff_base_seconds:
+    description: "Base delay in seconds for exponential backoff between retries."
+    required: false
+    default: "1.0"
 
 outputs:
   results:
@@ -47,6 +55,8 @@ runs:
         INPUT_SLACK_WEBHOOK_URL: ${{ inputs.slack_webhook_url }}
         INPUT_TIMEOUT: ${{ inputs.timeout }}
         INPUT_FAIL_ON_UNHEALTHY: ${{ inputs.fail_on_unhealthy }}
+        INPUT_RETRY_COUNT: ${{ inputs.retry_count }}
+        INPUT_BACKOFF_BASE_SECONDS: ${{ inputs.backoff_base_seconds }}
       run: |
         cd ${{ github.action_path }}
         uv run python -m heartbeat

@@ -118,3 +118,52 @@ def test_parse_services_missing_url():
 def test_parse_services_item_not_a_dict():
     with pytest.raises(ValueError, match="must be a YAML mapping"):
         _parse_services("- not-a-dict\n")
+
+
+def test_from_env_retry_defaults(monkeypatch):
+    monkeypatch.setenv("INPUT_SERVICES", SERVICES_YAML)
+    monkeypatch.delenv("INPUT_RETRY_COUNT", raising=False)
+    monkeypatch.delenv("HEARTBEAT_RETRY_COUNT", raising=False)
+    monkeypatch.delenv("INPUT_BACKOFF_BASE_SECONDS", raising=False)
+    monkeypatch.delenv("HEARTBEAT_BACKOFF_BASE_SECONDS", raising=False)
+    config = HeartbeatConfig.from_env()
+    assert config.default_retry_count == 5
+    assert config.default_backoff_base_seconds == 1.0
+
+
+def test_from_env_custom_retry_count(monkeypatch):
+    monkeypatch.setenv("INPUT_SERVICES", SERVICES_YAML)
+    monkeypatch.setenv("INPUT_RETRY_COUNT", "3")
+    config = HeartbeatConfig.from_env()
+    assert config.default_retry_count == 3
+    assert all(s.retry_count == 3 for s in config.services)
+
+
+def test_from_env_custom_retry_count_fallback(monkeypatch):
+    monkeypatch.setenv("INPUT_SERVICES", SERVICES_YAML)
+    monkeypatch.delenv("INPUT_RETRY_COUNT", raising=False)
+    monkeypatch.setenv("HEARTBEAT_RETRY_COUNT", "2")
+    config = HeartbeatConfig.from_env()
+    assert config.default_retry_count == 2
+
+
+def test_from_env_custom_backoff_base_seconds(monkeypatch):
+    monkeypatch.setenv("INPUT_SERVICES", SERVICES_YAML)
+    monkeypatch.setenv("INPUT_BACKOFF_BASE_SECONDS", "2.5")
+    config = HeartbeatConfig.from_env()
+    assert config.default_backoff_base_seconds == 2.5
+    assert all(s.backoff_base_seconds == 2.5 for s in config.services)
+
+
+def test_parse_services_per_service_retry_override():
+    yaml = "- name: svc\n  url: https://example.com\n  retry_count: 1\n  backoff_base_seconds: 0.5\n"
+    services = _parse_services(yaml, default_retry_count=5, default_backoff_base_seconds=1.0)
+    assert services[0].retry_count == 1
+    assert services[0].backoff_base_seconds == 0.5
+
+
+def test_parse_services_inherits_global_retry_defaults():
+    yaml = "- name: svc\n  url: https://example.com\n"
+    services = _parse_services(yaml, default_retry_count=3, default_backoff_base_seconds=2.0)
+    assert services[0].retry_count == 3
+    assert services[0].backoff_base_seconds == 2.0

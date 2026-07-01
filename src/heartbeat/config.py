@@ -13,6 +13,8 @@ class HeartbeatConfig:
     slack_webhook_url: "str | None" = None
     default_timeout: "float" = 10.0
     fail_on_unhealthy: "bool" = True
+    default_retry_count: "int" = 5
+    default_backoff_base_seconds: "float" = 1.0
 
     @classmethod
     def from_env(cls) -> "HeartbeatConfig":
@@ -29,8 +31,6 @@ class HeartbeatConfig:
                 "to a YAML sequence of service definitions."
             )
 
-        services = _parse_services(services_yaml)
-
         # fetch optional slack webhook url from environment variables
         slack_webhook_url = os.environ.get("INPUT_SLACK_WEBHOOK_URL") or os.environ.get("HEARTBEAT_SLACK_WEBHOOK_URL")
 
@@ -42,15 +42,31 @@ class HeartbeatConfig:
         raw_fail = os.environ.get("INPUT_FAIL_ON_UNHEALTHY") or os.environ.get("HEARTBEAT_FAIL_ON_UNHEALTHY")
         fail_on_unhealthy = raw_fail.lower() not in ("false", "0", "no") if raw_fail else True
 
+        # fetch optional default retry count and backoff base seconds from environment variables
+        raw_retry = os.environ.get("INPUT_RETRY_COUNT") or os.environ.get("HEARTBEAT_RETRY_COUNT")
+        default_retry_count = int(raw_retry) if raw_retry else 5
+
+        # fetch optional default backoff base seconds from environment variables
+        raw_backoff = os.environ.get("INPUT_BACKOFF_BASE_SECONDS") or os.environ.get("HEARTBEAT_BACKOFF_BASE_SECONDS")
+        default_backoff_base_seconds = float(raw_backoff) if raw_backoff else 1.0
+
+        services = _parse_services(services_yaml, default_retry_count, default_backoff_base_seconds)
+
         return cls(
             services=services,
             slack_webhook_url=slack_webhook_url,
             default_timeout=default_timeout,
             fail_on_unhealthy=fail_on_unhealthy,
+            default_retry_count=default_retry_count,
+            default_backoff_base_seconds=default_backoff_base_seconds,
         )
 
 
-def _parse_services(services_yaml: "str") -> "list[ServiceConfig]":
+def _parse_services(
+    services_yaml: "str",
+    default_retry_count: "int" = 5,
+    default_backoff_base_seconds: "float" = 1.0,
+) -> "list[ServiceConfig]":
     """
     parses the services configuration from a YAML string.
     The expected format is a YAML sequence of mappings, each containing:
@@ -90,6 +106,8 @@ def _parse_services(services_yaml: "str") -> "list[ServiceConfig]":
                 response_time_threshold_ms=float(item["response_time_threshold_ms"])
                 if item.get("response_time_threshold_ms") is not None
                 else None,
+                retry_count=int(item.get("retry_count", default_retry_count)),
+                backoff_base_seconds=float(item.get("backoff_base_seconds", default_backoff_base_seconds)),
             )
         )
 
