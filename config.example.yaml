@@ -1,0 +1,21 @@
+services:
+  - name: api
+    url: https://api.example.com
+    health_path: /healthz
+  - name: gateway
+    url: https://gateway.example.com
+    health_path: /health
+    response_time_threshold_ms: 500
+  - name: backend
+    url: https://backend.example.com
+    expected_status_codes: [200, 204]
+    retry_count: 3
+    backoff_base_seconds: 0.5
+
+# slack_webhook_url: https://hooks.slack.com/services/...
+# Alternatively, set the HEARTBEAT_SLACK_WEBHOOK_URL environment variable.
+
+timeout: 10
+fail_on_unhealthy: true
+retry_count: 5
+backoff_base_seconds: 1.0

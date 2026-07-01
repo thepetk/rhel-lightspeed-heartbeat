@@ -1,6 +1,3 @@
-import json
-import os
-import tempfile
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -42,42 +39,10 @@ async def test_run_unhealthy_triggers_slack():
 
 
 @respx.mock
-async def test_run_sets_github_output():
-    respx.get("https://api.example.com/healthz").mock(return_value=httpx.Response(200))
-    config = make_config()
-    runner = HeartbeatRunner(config)
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
-        output_path = f.name
-    try:
-        with patch.dict(os.environ, {"GITHUB_OUTPUT": output_path}):
-            await runner.run()
-        with open(output_path) as fh:
-            content = fh.read()
-        assert "healthy=true" in content
-        data = json.loads(content.split("results=")[1].strip())
-        assert data[0]["name"] == "rlsapi"
-        assert data[0]["status"] == "healthy"
-    finally:
-        os.unlink(output_path)
-
-
-@respx.mock
-async def test_run_no_github_output_env():
-    respx.get("https://api.example.com/healthz").mock(return_value=httpx.Response(200))
-    config = make_config()
-    runner = HeartbeatRunner(config)
-    env = {k: v for k, v in os.environ.items() if k != "GITHUB_OUTPUT"}
-    with patch.dict(os.environ, env, clear=True):
-        results = await runner.run()
-    assert len(results) == 1
-
-
-@respx.mock
 async def test_notify_skipped_when_no_webhook():
     respx.get("https://api.example.com/healthz").mock(return_value=httpx.Response(503))
     config = make_config(slack_url=None)
     runner = HeartbeatRunner(config)
-    # should not raise even with no webhook and unhealthy services
     results = await runner.run()
     assert results[0].status == HealthStatus.UNHEALTHY
 
@@ -141,7 +106,7 @@ async def test_print_results_shows_error_message():
 
 
 def test_print_results_degraded_warning(capsys):
-    """Exercises the DEGRADED ::warning:: path in _print_results."""
+    """Exercises the DEGRADED warning path in _print_results."""
     from heartbeat.models import HealthResult, HealthStatus
 
     svc = ServiceConfig(name="slow-svc", url="https://slow.example.com", response_time_threshold_ms=500.0)
@@ -150,4 +115,5 @@ def test_print_results_degraded_warning(capsys):
     runner = HeartbeatRunner(config)
     runner._print_results([degraded])
     captured = capsys.readouterr()
+    assert "WARNING" in captured.err
     assert "DEGRADED" in captured.err

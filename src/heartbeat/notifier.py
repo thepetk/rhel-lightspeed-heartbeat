@@ -1,5 +1,4 @@
 import logging
-import os
 from typing import Any
 
 import httpx
@@ -57,7 +56,7 @@ def _build_message(payload: "AlertPayload") -> "dict[str, Any]":
     else:
         header = ":white_check_mark: [RESOLVED] Heartbeat"
 
-    blocks: "list[dict[str, Any]]" = [
+    blocks: list[dict[str, Any]] = [
         {"type": "header", "text": {"type": "plain_text", "text": header}},
         {
             "type": "section",
@@ -88,7 +87,7 @@ def _build_service_blocks(result: "HealthResult") -> "list[dict[str, Any]]":
     if result.status_code is not None:
         status_text += f" (HTTP {result.status_code})"
 
-    fields: "list[dict[str, Any]]" = [
+    fields: list[dict[str, Any]] = [
         {"type": "mrkdwn", "text": f"*Service:*\n{result.service.name}"},
         {"type": "mrkdwn", "text": f"*Status:*\n{status_text}"},
     ]
@@ -109,17 +108,5 @@ def _build_service_blocks(result: "HealthResult") -> "list[dict[str, Any]]":
 
 
 def _build_footer(payload: "AlertPayload") -> "dict[str, Any]":
-    """
-    builds a Slack message footer block with the timestamp of the alert and a link to the
-    GitHub Actions run that triggered the alert, if available.
-    """
     ts = payload.timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
-    parts = [f":clock1: {ts}"]
-
-    server = os.environ.get("GITHUB_SERVER_URL")
-    repo = os.environ.get("GITHUB_REPOSITORY")
-    run_id = os.environ.get("GITHUB_RUN_ID")
-    if server and repo and run_id:
-        parts.append(f"<{server}/{repo}/actions/runs/{run_id}|GitHub Actions Run #{run_id}>")
-
-    return {"type": "context", "elements": [{"type": "mrkdwn", "text": " | ".join(parts)}]}
+    return {"type": "context", "elements": [{"type": "mrkdwn", "text": f":clock1: {ts}"}]}

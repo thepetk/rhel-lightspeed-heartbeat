@@ -1,78 +1,71 @@
 # Heartbeat
 
-A GitHub Action that probes service health endpoints concurrently and sends Slack alerts formatted like Prometheus Alertmanager notifications when something is down or degraded.
+A CLI tool that probes service health endpoints concurrently and sends Slack alerts formatted like Prometheus Alertmanager notifications when something is down or degraded.
 
 ## Quick Start
-
-### As a GitHub Action
-
-```yaml
-- uses: thepetk/heartbeat@main
-  with:
-    services: |
-      - name: api
-        url: https://api.example.com
-      - name: gateway
-        url: https://gateway.example.com
-        health_path: /health
-      - name: backend
-        url: https://backend.example.com
-        response_time_threshold_ms: 2000
-    slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-```
-
-### Use outputs in subsequent steps
-
-```yaml
-- id: heartbeat
-  uses: thepetk/heartbeat@main
-  with:
-    services: |
-      - name: api
-        url: https://api.example.com
-    fail_on_unhealthy: "false"
-
-- run: echo "All healthy? ${{ steps.heartbeat.outputs.healthy }}"
-- run: echo "Results JSON: ${{ steps.heartbeat.outputs.results }}"
-```
 
 ### Run locally
 
 ```bash
-export HEARTBEAT_SERVICES='
-- name: httpbin
-  url: https://httpbin.org
-  health_path: /status/200
-'
-# Optional:
-export HEARTBEAT_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
+git clone https://github.com/thepetk/heartbeat
+cd heartbeat
+pip install .
 
-uv run python -m heartbeat
+cp config.example.yaml config.yaml
+# edit config.yaml with your services
+heartbeat config.yaml
+```
+
+### Run as a container
+
+```bash
+docker build -f Containerfile -t heartbeat .
+docker run -v $(pwd)/config.yaml:/app/config.yaml heartbeat
+```
+
+Pass the Slack webhook via environment variable to avoid putting it in the config file:
+
+```bash
+docker run \
+  -v $(pwd)/config.yaml:/app/config.yaml \
+  -e HEARTBEAT_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/... \
+  heartbeat
 ```
 
 ## Configuration
 
-### Action Inputs
+Create a YAML config file (see `config.example.yaml`):
 
-| Input                   | Required | Default  | Description                                                    |
-| ----------------------- | -------- | -------- | -------------------------------------------------------------- |
-| `services`              | Yes      | —        | YAML sequence of service definitions (see format below)        |
-| `slack_webhook_url`     | No       | `""`     | Slack incoming webhook URL for failure notifications           |
-| `timeout`               | No       | `"10"`   | Default HTTP probe timeout in seconds                          |
-| `fail_on_unhealthy`     | No       | `"true"` | Exit with failure code if any service is unhealthy or degraded |
-| `retry_count`           | No       | `"5"`    | Number of retries per service before marking it as failed      |
-| `backoff_base_seconds`  | No       | `"1.0"`  | Base delay in seconds for exponential backoff between retries  |
+```yaml
+services:
+  - name: api
+    url: https://api.example.com
+  - name: gateway
+    url: https://gateway.example.com
+    health_path: /health
+    response_time_threshold_ms: 500
 
-### Action Outputs
+# slack_webhook_url: https://hooks.slack.com/...
+# Or set the HEARTBEAT_SLACK_WEBHOOK_URL environment variable instead.
 
-| Output    | Type                 | Description                                                         |
-| --------- | -------------------- | ------------------------------------------------------------------- |
-| `healthy` | `"true"` / `"false"` | Whether all services are healthy (HEALTHY or DEGRADED counts as ok) |
-| `results` | JSON string          | Array of per-service check results                                  |
+timeout: 10
+fail_on_unhealthy: true
+retry_count: 5
+backoff_base_seconds: 1.0
+```
 
-### Services YAML Format
+### Top-level fields
 
-Each service entry in the `services` sequence supports:
+| Field                  | Required | Default  | Description                                                    |
+| ---------------------- | -------- | -------- | -------------------------------------------------------------- |
+| `services`             | Yes      | —        | List of service definitions (see format below)                 |
+| `slack_webhook_url`    | No       | `null`   | Slack incoming webhook URL (overridden by env var, see below)  |
+| `timeout`              | No       | `10`     | Default HTTP probe timeout in seconds                          |
+| `fail_on_unhealthy`    | No       | `true`   | Exit with code 1 if any service is unhealthy or degraded       |
+| `retry_count`          | No       | `5`      | Default number of retries per service before marking as failed |
+| `backoff_base_seconds` | No       | `1.0`    | Base delay in seconds for exponential backoff between retries  |
+
+### Service fields
 
 | Field                        | Required | Default      | Description                                                                      |
 | ---------------------------- | -------- | ------------ | -------------------------------------------------------------------------------- |
@@ -82,19 +75,14 @@ Each service entry in the `services` sequence supports:
 | `timeout_seconds`            | No       | `10.0`       | Per-service HTTP timeout in seconds                                              |
 | `expected_status_codes`      | No       | `[200]`      | List of HTTP status codes that indicate healthy                                  |
 | `response_time_threshold_ms` | No       | omit         | If set, responses slower than this are marked DEGRADED                           |
-| `retry_count`                | No       | global       | Per-service override for number of retries (defaults to `retry_count` input)     |
-| `backoff_base_seconds`       | No       | global       | Per-service override for backoff base delay (defaults to `backoff_base_seconds`) |
+| `retry_count`                | No       | global       | Per-service override for number of retries                                       |
+| `backoff_base_seconds`       | No       | global       | Per-service override for backoff base delay                                      |
 
-### Environment Variables (local use)
+### Environment variable
 
-| Variable                          | Description                     |
-| --------------------------------- | ------------------------------- |
-| `HEARTBEAT_SERVICES`              | Same format as `services` input |
-| `HEARTBEAT_SLACK_WEBHOOK_URL`     | Slack webhook URL               |
-| `HEARTBEAT_TIMEOUT`               | Default timeout in seconds      |
-| `HEARTBEAT_FAIL_ON_UNHEALTHY`     | `"true"` / `"false"`            |
-| `HEARTBEAT_RETRY_COUNT`           | Number of retries per service   |
-| `HEARTBEAT_BACKOFF_BASE_SECONDS`  | Backoff base delay in seconds   |
+| Variable                     | Description                                                   |
+| ---------------------------- | ------------------------------------------------------------- |
+| `HEARTBEAT_SLACK_WEBHOOK_URL`| Overrides `slack_webhook_url` from the config file if set     |
 
 ## Health Statuses
 
@@ -106,18 +94,18 @@ Each service entry in the `services` sequence supports:
 | `TIMEOUT`   | Request timed out                                                     |
 | `ERROR`     | Network or connection error                                           |
 
-`fail_on_unhealthy` causes a non-zero exit for any status that is not HEALTHY or DEGRADED. DEGRADED services emit a `::warning::` annotation but do not fail the action.
+`fail_on_unhealthy` causes a non-zero exit for any status that is not HEALTHY or DEGRADED. DEGRADED services emit a `WARNING:` message to stderr but do not fail.
 
 Any non-HEALTHY result triggers the retry logic. The delay between attempts follows exponential backoff: `backoff_base_seconds × 2^attempt` (1 s, 2 s, 4 s, … with the default 1.0 s base). A Slack alert is only sent if all retries are exhausted and the service is still not healthy.
 
 ## Slack Alert Format
 
-When one or more services are not ok, the action posts a Slack message with:
+When one or more services are not ok, the tool posts a Slack message with:
 
 - Red sidebar (`#EE0000`) for firing alerts, green (`#36A64F`) for resolved
 - `[FIRING:N]` header counting affected services
 - Per-service section with status emoji, HTTP code, response time, threshold, and error detail
-- Footer with timestamp and link to the GitHub Actions run
+- Footer with timestamp
 
 Example alert structure:
 
@@ -131,7 +119,7 @@ Service: api          Status: ✗ UNHEALTHY (HTTP 503)
 Service: backend      Status: ⚠ DEGRADED (HTTP 200)
   Response time: 3120ms | Threshold: 2000ms | URL: https://backend.example.com/healthz
 ────────────────────────────────────────
-🕐 2026-06-30T12:00:00Z | GitHub Actions Run #123
+🕐 2026-06-30T12:00:00Z
 ```
 
 ## Development
@@ -151,15 +139,16 @@ make install
 
 ### Make Targets
 
-| Target            | Description                                               |
-| ----------------- | --------------------------------------------------------- |
-| `make install`    | Install dependencies with uv                              |
-| `make lint`       | Run ruff linter                                           |
-| `make format`     | Check formatting with ruff                                |
-| `make format-fix` | Auto-fix formatting                                       |
-| `make type-check` | Run ty type checker                                       |
-| `make test`       | Run tests                                                 |
-| `make test-cov`   | Run tests with coverage report                            |
-| `make run`        | Run heartbeat locally (requires `HEARTBEAT_SERVICES`)     |
-| `make check`      | Run all checks (lint, format, types, tests with coverage) |
-| `make clean`      | Remove build artifacts and caches                         |
+| Target              | Description                                               |
+| ------------------- | --------------------------------------------------------- |
+| `make install`      | Install dependencies with uv                             |
+| `make lint`         | Run ruff linter                                           |
+| `make format`       | Check formatting with ruff                                |
+| `make format-fix`   | Auto-fix formatting                                       |
+| `make type-check`   | Run ty type checker                                       |
+| `make test`         | Run tests                                                 |
+| `make test-cov`     | Run tests with coverage report                            |
+| `make run`          | Run heartbeat locally (requires `config.yaml`)            |
+| `make container-build` | Build container image                                  |
+| `make check`        | Run all checks (lint, format, types, tests with coverage) |
+| `make clean`        | Remove build artifacts and caches                         |

@@ -31,3 +31,11 @@ jobs:
 
       - name: Test with coverage
         run: uv run pytest tests/ -v --cov=heartbeat --cov-report=term-missing
+
+  container-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+
+      - name: Build container image
+        run: docker build -f Containerfile -t heartbeat:ci .

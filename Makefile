@@ -1,4 +1,4 @@
-.PHONY: install lint format format-fix type-check test test-cov run check clean help
+.PHONY: install lint format format-fix type-check test test-cov run container-build check clean help
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -25,8 +25,11 @@ test: ## Run tests
 test-cov: ## Run tests with coverage report
 	uv run pytest tests/ -v --cov=heartbeat --cov-report=term-missing
 
-run: ## Run heartbeat locally (requires HEARTBEAT_SERVICES_JSON env var)
-	uv run python -m heartbeat
+run: ## Run heartbeat locally (requires config.yaml)
+	uv run heartbeat config.yaml
+
+container-build: ## Build container image
+	docker build -f Containerfile -t heartbeat:latest .
 
 check: lint format type-check test-cov ## Run all checks (lint, format, types, tests)
 

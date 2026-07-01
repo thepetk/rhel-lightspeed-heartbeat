@@ -103,7 +103,9 @@ async def test_check_no_retry_on_healthy(service, mock_asyncio_sleep):
 
 @respx.mock
 async def test_check_retries_on_unhealthy_then_healthy(mock_asyncio_sleep):
-    svc = ServiceConfig(name="svc", url="https://api.example.com", health_path="/healthz", retry_count=2, backoff_base_seconds=1.0)
+    svc = ServiceConfig(
+        name="svc", url="https://api.example.com", health_path="/healthz", retry_count=2, backoff_base_seconds=1.0
+    )
     responses = iter([httpx.Response(503), httpx.Response(200)])
     respx.get("https://api.example.com/healthz").mock(side_effect=lambda _: next(responses))
     async with HealthChecker() as checker:
@@ -114,7 +116,9 @@ async def test_check_retries_on_unhealthy_then_healthy(mock_asyncio_sleep):
 
 @respx.mock
 async def test_check_retries_exhausted_returns_last_failure(mock_asyncio_sleep):
-    svc = ServiceConfig(name="svc", url="https://api.example.com", health_path="/healthz", retry_count=3, backoff_base_seconds=1.0)
+    svc = ServiceConfig(
+        name="svc", url="https://api.example.com", health_path="/healthz", retry_count=3, backoff_base_seconds=1.0
+    )
     respx.get("https://api.example.com/healthz").mock(return_value=httpx.Response(503))
     async with HealthChecker() as checker:
         result = await checker.check(svc)
@@ -135,13 +139,18 @@ async def test_check_zero_retries_no_sleep(mock_asyncio_sleep):
 @respx.mock
 async def test_check_retries_on_degraded(mock_asyncio_sleep, monkeypatch):
     svc = ServiceConfig(
-        name="svc", url="https://api.example.com", health_path="/healthz",
-        retry_count=2, backoff_base_seconds=2.0, response_time_threshold_ms=1,
+        name="svc",
+        url="https://api.example.com",
+        health_path="/healthz",
+        retry_count=2,
+        backoff_base_seconds=2.0,
+        response_time_threshold_ms=1,
     )
     respx.get("https://api.example.com/healthz").mock(return_value=httpx.Response(200))
 
     # odd calls = start timestamp, even calls = start + 1s → always 1000ms elapsed > 1ms threshold
     import heartbeat.checker as checker_mod
+
     call_count = [0]
     original_monotonic = checker_mod.time.monotonic
 
@@ -160,7 +169,9 @@ async def test_check_retries_on_degraded(mock_asyncio_sleep, monkeypatch):
 
 @respx.mock
 async def test_check_backoff_uses_custom_base(mock_asyncio_sleep):
-    svc = ServiceConfig(name="svc", url="https://api.example.com", health_path="/healthz", retry_count=3, backoff_base_seconds=0.5)
+    svc = ServiceConfig(
+        name="svc", url="https://api.example.com", health_path="/healthz", retry_count=3, backoff_base_seconds=0.5
+    )
     respx.get("https://api.example.com/healthz").mock(return_value=httpx.Response(503))
     async with HealthChecker() as checker:
         await checker.check(svc)

@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, cast
 
 import yaml
@@ -17,76 +18,58 @@ class HeartbeatConfig:
     default_backoff_base_seconds: "float" = 1.0
 
     @classmethod
-    def from_env(cls) -> "HeartbeatConfig":
+    def from_file(cls, path: "str | Path") -> "HeartbeatConfig":
         """
-        fetches configuration from environment variables. It looks for the following variables:
-        - `INPUT_SERVICES` or `HEARTBEAT_SERVICES`: YAML sequence of service definitions.
+        loads configuration from a YAML file. The top-level keys map directly to
+        HeartbeatConfig fields. slack_webhook_url can be overridden by the
+        HEARTBEAT_SLACK_WEBHOOK_URL environment variable (useful for secrets in containers).
         """
+        try:
+            with open(path) as f:
+                raw = yaml.safe_load(f)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Configuration file not found: {path}") from None
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid YAML in configuration file: {e}") from e
 
-        # fetch services configuration from environment variables
-        services_yaml = os.environ.get("INPUT_SERVICES") or os.environ.get("HEARTBEAT_SERVICES")
-        if not services_yaml:
-            raise ValueError(
-                "No services configured. Set INPUT_SERVICES or HEARTBEAT_SERVICES "
-                "to a YAML sequence of service definitions."
-            )
+        if not isinstance(raw, dict):
+            raise ValueError("Configuration file must be a YAML mapping.")
 
-        # fetch optional slack webhook url from environment variables
-        slack_webhook_url = os.environ.get("INPUT_SLACK_WEBHOOK_URL") or os.environ.get("HEARTBEAT_SLACK_WEBHOOK_URL")
+        if "services" not in raw:
+            raise ValueError("Configuration file must contain a 'services' key.")
 
-        # fetch optional default timeout and fail_on_unhealthy from environment variables
-        raw_timeout = os.environ.get("INPUT_TIMEOUT") or os.environ.get("HEARTBEAT_TIMEOUT")
-        default_timeout = float(raw_timeout) if raw_timeout else 10.0
+        default_retry_count = int(raw.get("retry_count", 5))
+        default_backoff_base_seconds = float(raw.get("backoff_base_seconds", 1.0))
 
-        # fetch optional fail_on_unhealthy from environment variables
-        raw_fail = os.environ.get("INPUT_FAIL_ON_UNHEALTHY") or os.environ.get("HEARTBEAT_FAIL_ON_UNHEALTHY")
-        fail_on_unhealthy = raw_fail.lower() not in ("false", "0", "no") if raw_fail else True
+        services = _parse_services(raw["services"], default_retry_count, default_backoff_base_seconds)
 
-        # fetch optional default retry count and backoff base seconds from environment variables
-        raw_retry = os.environ.get("INPUT_RETRY_COUNT") or os.environ.get("HEARTBEAT_RETRY_COUNT")
-        default_retry_count = int(raw_retry) if raw_retry else 5
-
-        # fetch optional default backoff base seconds from environment variables
-        raw_backoff = os.environ.get("INPUT_BACKOFF_BASE_SECONDS") or os.environ.get("HEARTBEAT_BACKOFF_BASE_SECONDS")
-        default_backoff_base_seconds = float(raw_backoff) if raw_backoff else 1.0
-
-        services = _parse_services(services_yaml, default_retry_count, default_backoff_base_seconds)
+        slack_webhook_url = os.environ.get("HEARTBEAT_SLACK_WEBHOOK_URL") or raw.get("slack_webhook_url") or None
 
         return cls(
             services=services,
             slack_webhook_url=slack_webhook_url,
-            default_timeout=default_timeout,
-            fail_on_unhealthy=fail_on_unhealthy,
+            default_timeout=float(raw.get("timeout", 10.0)),
+            fail_on_unhealthy=bool(raw.get("fail_on_unhealthy", True)),
             default_retry_count=default_retry_count,
             default_backoff_base_seconds=default_backoff_base_seconds,
         )
 
 
 def _parse_services(
-    services_yaml: "str",
+    services_raw: "list[dict[str, Any]]",
     default_retry_count: "int" = 5,
     default_backoff_base_seconds: "float" = 1.0,
 ) -> "list[ServiceConfig]":
     """
-    parses the services configuration from a YAML string.
-    The expected format is a YAML sequence of mappings, each containing:
-    - `name`: The name of the service (string, required).
-    - `url`: The base URL of the service (string, required).
-    - `health_path`: The path to the health endpoint (string, optional, default: "/healthz").
-    - `timeout_seconds`: The timeout for the health check request (float, optional, default: 10.0).
-    - `expected_status_codes`: A list of expected HTTP status codes (list of int, optional, default: [200]).
-    - `response_time_threshold_ms`: The response time threshold in milliseconds (float, optional).
+    parses a list of service definitions into ServiceConfig objects. Each entry must have
+    'name' and 'url' fields. Optional fields: 'health_path', 'timeout_seconds',
+    'expected_status_codes', 'response_time_threshold_ms', 'retry_count', 'backoff_base_seconds'.
     """
-    try:
-        raw = yaml.safe_load(services_yaml)
-    except yaml.YAMLError as e:
-        raise ValueError(f"Invalid YAML in services configuration: {e}") from e
-
-    if not isinstance(raw, list):
-        raise ValueError("Services configuration must be a YAML sequence.")
+    if not isinstance(services_raw, list):
+        raise ValueError("'services' must be a YAML sequence.")
 
     services = []
-    for i, entry in enumerate(raw):
+    for i, entry in enumerate(services_raw):
         if not isinstance(entry, dict):
             raise ValueError(f"Service at index {i} must be a YAML mapping.")
         item = cast(dict[str, Any], entry)

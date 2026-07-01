@@ -108,10 +108,7 @@ def test_build_message_degraded_included(degraded_result):
     assert "500" in blocks_text  # threshold
 
 
-def test_build_message_includes_github_link(unhealthy_result, monkeypatch):
-    monkeypatch.setenv("GITHUB_SERVER_URL", "https://github.com")
-    monkeypatch.setenv("GITHUB_REPOSITORY", "org/repo")
-    monkeypatch.setenv("GITHUB_RUN_ID", "12345")
+def test_build_message_footer_timestamp_only(unhealthy_result):
     payload = AlertPayload(
         state=AlertState.FIRING,
         results=(unhealthy_result,),
@@ -119,8 +116,8 @@ def test_build_message_includes_github_link(unhealthy_result, monkeypatch):
     )
     msg = _build_message(payload)
     blocks_text = str(msg["attachments"][0]["blocks"])
-    assert "12345" in blocks_text
-    assert "github.com" in blocks_text
+    assert "clock1" in blocks_text
+    assert "github.com" not in blocks_text
 
 
 def test_build_message_with_error_message(service):

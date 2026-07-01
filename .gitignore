@@ -203,6 +203,9 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# Heartbeat config (may contain secrets)
+config.yaml
+
 # Ruff stuff:
 .ruff_cache/
 
