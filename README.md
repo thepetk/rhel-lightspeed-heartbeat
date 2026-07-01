@@ -87,12 +87,14 @@ Each service entry in the `services` sequence supports:
 
 ### Environment Variables (local use)
 
-| Variable                      | Description                     |
-| ----------------------------- | ------------------------------- |
-| `HEARTBEAT_SERVICES`          | Same format as `services` input |
-| `HEARTBEAT_SLACK_WEBHOOK_URL` | Slack webhook URL               |
-| `HEARTBEAT_TIMEOUT`           | Default timeout in seconds      |
-| `HEARTBEAT_FAIL_ON_UNHEALTHY` | `"true"` / `"false"`            |
+| Variable                          | Description                     |
+| --------------------------------- | ------------------------------- |
+| `HEARTBEAT_SERVICES`              | Same format as `services` input |
+| `HEARTBEAT_SLACK_WEBHOOK_URL`     | Slack webhook URL               |
+| `HEARTBEAT_TIMEOUT`               | Default timeout in seconds      |
+| `HEARTBEAT_FAIL_ON_UNHEALTHY`     | `"true"` / `"false"`            |
+| `HEARTBEAT_RETRY_COUNT`           | Number of retries per service   |
+| `HEARTBEAT_BACKOFF_BASE_SECONDS`  | Backoff base delay in seconds   |
 
 ## Health Statuses
 
