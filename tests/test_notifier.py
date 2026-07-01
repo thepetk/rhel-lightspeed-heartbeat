@@ -2,7 +2,7 @@ import httpx
 import pytest
 import respx
 
-from heartbeat.models import AlertPayload, AlertState, HealthResult, HealthStatus, ServiceConfig
+from heartbeat.models import AlertPayload, AlertState, AuthConfig, HealthResult, HealthStatus, ServiceConfig
 from heartbeat.notifier import SlackNotifier, _build_message
 
 
@@ -129,3 +129,15 @@ def test_build_message_with_error_message(service):
     payload = AlertPayload(state=AlertState.FIRING, results=(result,), summary="1 down")
     msg = _build_message(payload)
     assert "connection refused" in str(msg["attachments"][0]["blocks"])
+
+
+def test_build_message_shows_auth_type():
+    svc = ServiceConfig(
+        name="prod",
+        url="https://example.com",
+        auth=AuthConfig(type="mtls", cert_path="/cert.pem", key_path="/key.pem"),
+    )
+    result = HealthResult(service=svc, status=HealthStatus.UNHEALTHY, status_code=503)
+    payload = AlertPayload(state=AlertState.FIRING, results=(result,), summary="1 down")
+    msg = _build_message(payload)
+    assert "mtls" in str(msg["attachments"][0]["blocks"])

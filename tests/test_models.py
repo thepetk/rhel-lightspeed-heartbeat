@@ -2,7 +2,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from heartbeat.models import AlertState, HealthResult, HealthStatus, ServiceConfig
+from heartbeat.models import AlertState, AuthConfig, HealthResult, HealthStatus, ServiceConfig
 
 
 def test_service_config_defaults():
@@ -11,6 +11,32 @@ def test_service_config_defaults():
     assert s.timeout_seconds == 10.0
     assert s.expected_status_codes == (200,)
     assert s.response_time_threshold_ms is None
+    assert s.method == "GET"
+    assert s.body is None
+    assert s.proxy is None
+    assert s.auth is None
+
+
+def test_auth_config_mtls():
+    a = AuthConfig(type="mtls", cert_path="/cert.pem", key_path="/key.pem")
+    assert a.type == "mtls"
+    assert a.cert_path == "/cert.pem"
+    assert a.key_path == "/key.pem"
+    assert a.token_env_var is None
+
+
+def test_auth_config_saml_session():
+    a = AuthConfig(type="saml_session", token_env_var="MY_TOKEN")
+    assert a.type == "saml_session"
+    assert a.token_env_var == "MY_TOKEN"
+    assert a.cert_path is None
+    assert a.key_path is None
+
+
+def test_auth_config_is_frozen():
+    a = AuthConfig(type="mtls")
+    with pytest.raises(FrozenInstanceError):
+        a.type = "other"  # type: ignore[misc]
 
 
 def test_service_config_custom():

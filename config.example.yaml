@@ -1,16 +1,57 @@
 services:
+  # Plain GET health check (no auth)
   - name: api
     url: https://api.example.com
     health_path: /healthz
+
+  # GET with response time threshold
   - name: gateway
     url: https://gateway.example.com
     health_path: /health
     response_time_threshold_ms: 500
+
+  # GET with custom expected status codes and retry override
   - name: backend
     url: https://backend.example.com
     expected_status_codes: [200, 204]
     retry_count: 3
     backoff_base_seconds: 0.5
+
+  # POST with mTLS (Production)
+  # Requires a RHEL machine subscribed to the CDN; certs at /etc/pki/consumer
+  - name: lightspeed-prod
+    url: https://cert.console.redhat.com
+    health_path: /api/lightspeed/v1/infer
+    method: POST
+    body: {"question": "What is SELinux?"}
+    auth:
+      type: mtls
+      cert_path: /etc/pki/consumer/cert.pem
+      key_path: /etc/pki/consumer/key.pem
+
+  # POST with mTLS + proxy (Stage — VPN required)
+  - name: lightspeed-stage
+    url: https://cert.console.stage.redhat.com
+    health_path: /api/lightspeed/v1/infer
+    method: POST
+    body: {"question": "What is SELinux?"}
+    proxy: http://squid.corp.redhat.com:3128
+    auth:
+      type: mtls
+      cert_path: /etc/pki/consumer/cert.pem
+      key_path: /etc/pki/consumer/key.pem
+
+  # POST with SAML session cookie + proxy (Stage Unstable — VPN required)
+  # Token is read at runtime from the env var named by token_env_var
+  - name: lightspeed-stage-unstable
+    url: https://internal.console.stage.redhat.com
+    health_path: /api/lightspeed/v1/infer
+    method: POST
+    body: {"question": "What is SELinux?"}
+    proxy: http://squid.corp.redhat.com:3128
+    auth:
+      type: saml_session
+      token_env_var: STAGE_UNSTABLE_SAML_TOKEN
 
 # slack_webhook_url: https://hooks.slack.com/services/...
 # Alternatively, set the HEARTBEAT_SLACK_WEBHOOK_URL environment variable.

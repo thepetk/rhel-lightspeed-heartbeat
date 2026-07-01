@@ -1,11 +1,11 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import yaml
 
-from heartbeat.models import ServiceConfig
+from heartbeat.models import AuthConfig, ServiceConfig
 
 
 @dataclass
@@ -63,7 +63,8 @@ def _parse_services(
     """
     parses a list of service definitions into ServiceConfig objects. Each entry must have
     'name' and 'url' fields. Optional fields: 'health_path', 'timeout_seconds',
-    'expected_status_codes', 'response_time_threshold_ms', 'retry_count', 'backoff_base_seconds'.
+    'expected_status_codes', 'response_time_threshold_ms', 'retry_count', 'backoff_base_seconds',
+    'method', 'body', 'proxy', 'auth'.
     """
     if not isinstance(services_raw, list):
         raise ValueError("'services' must be a YAML sequence.")
@@ -72,7 +73,7 @@ def _parse_services(
     for i, entry in enumerate(services_raw):
         if not isinstance(entry, dict):
             raise ValueError(f"Service at index {i} must be a YAML mapping.")
-        item = cast(dict[str, Any], entry)
+        item = entry
         if "name" not in item:
             raise ValueError(f"Service at index {i} is missing required field 'name'.")
         if "url" not in item:
@@ -91,7 +92,38 @@ def _parse_services(
                 else None,
                 retry_count=int(item.get("retry_count", default_retry_count)),
                 backoff_base_seconds=float(item.get("backoff_base_seconds", default_backoff_base_seconds)),
+                method=str(item.get("method", "GET")).upper(),
+                body=item.get("body") or None,
+                proxy=str(item["proxy"]) if item.get("proxy") is not None else None,
+                auth=_parse_auth(item["auth"], i) if item.get("auth") is not None else None,
             )
         )
 
     return services
+
+
+def _parse_auth(raw: "dict[str, Any]", service_index: "int") -> "AuthConfig":
+    auth_type = raw.get("type")
+    if auth_type not in ("mtls", "saml_session"):
+        raise ValueError(
+            f"Service at index {service_index}: auth.type must be 'mtls' or 'saml_session', got {auth_type!r}."
+        )
+
+    if auth_type == "mtls":
+        cert_path = raw.get("cert_path")
+        key_path = raw.get("key_path")
+        if not cert_path:
+            raise ValueError(f"Service at index {service_index}: mtls auth requires 'cert_path'.")
+        if not key_path:
+            raise ValueError(f"Service at index {service_index}: mtls auth requires 'key_path'.")
+        if not Path(cert_path).is_file():
+            raise ValueError(f"Service at index {service_index}: cert_path '{cert_path}' does not exist.")
+        if not Path(key_path).is_file():
+            raise ValueError(f"Service at index {service_index}: key_path '{key_path}' does not exist.")
+        return AuthConfig(type="mtls", cert_path=str(cert_path), key_path=str(key_path))
+
+    # saml_session
+    token_env_var = raw.get("token_env_var")
+    if not token_env_var:
+        raise ValueError(f"Service at index {service_index}: saml_session auth requires 'token_env_var'.")
+    return AuthConfig(type="saml_session", token_env_var=str(token_env_var))

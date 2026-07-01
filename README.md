@@ -72,17 +72,59 @@ backoff_base_seconds: 1.0
 | `name`                       | Yes      | —            | Display name for the service                                                     |
 | `url`                        | Yes      | —            | Base URL of the service (without the health path)                                |
 | `health_path`                | No       | `"/healthz"` | Path to append to `url` for the health check request                             |
+| `method`                     | No       | `"GET"`      | HTTP method to use (`GET`, `POST`, etc.)                                         |
+| `body`                       | No       | omit         | JSON object to send as the request body (sets `Content-Type: application/json`)  |
+| `proxy`                      | No       | omit         | HTTP proxy URL (e.g. `http://squid.corp.redhat.com:3128`)                        |
 | `timeout_seconds`            | No       | `10.0`       | Per-service HTTP timeout in seconds                                              |
 | `expected_status_codes`      | No       | `[200]`      | List of HTTP status codes that indicate healthy                                  |
 | `response_time_threshold_ms` | No       | omit         | If set, responses slower than this are marked DEGRADED                           |
 | `retry_count`                | No       | global       | Per-service override for number of retries                                       |
 | `backoff_base_seconds`       | No       | global       | Per-service override for backoff base delay                                      |
+| `auth`                       | No       | omit         | Authentication block (see below)                                                 |
 
-### Environment variable
+### Auth block
 
-| Variable                     | Description                                                   |
-| ---------------------------- | ------------------------------------------------------------- |
-| `HEARTBEAT_SLACK_WEBHOOK_URL`| Overrides `slack_webhook_url` from the config file if set     |
+Set `auth` on a service to enable authentication. Two types are supported:
+
+**mTLS** — client certificate authentication:
+
+```yaml
+auth:
+  type: mtls
+  cert_path: /etc/pki/consumer/cert.pem
+  key_path: /etc/pki/consumer/key.pem
+```
+
+`cert_path` and `key_path` must point to existing files on disk (validated at startup).
+
+**SAML session cookie** — sets a `session` cookie from an environment variable:
+
+```yaml
+auth:
+  type: saml_session
+  token_env_var: MY_SAML_SESSION_TOKEN   # name of the env var holding the token
+```
+
+The token is read at runtime from the env var named by `token_env_var`. This allows different services to use different tokens. Heartbeat raises an error at check time if the env var is not set.
+
+### Environment variables
+
+| Variable                     | Description                                                        |
+| ---------------------------- | ------------------------------------------------------------------ |
+| `HEARTBEAT_SLACK_WEBHOOK_URL`| Overrides `slack_webhook_url` from the config file if set          |
+| *(any name)*                 | Used by `saml_session` auth — name specified in `auth.token_env_var` |
+
+### Running with certificates in a container
+
+Mount the cert directory as a read-only volume:
+
+```bash
+docker run \
+  -v $(pwd)/config.yaml:/app/config.yaml \
+  -v /etc/pki/consumer:/etc/pki/consumer:ro \
+  -e HEARTBEAT_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/... \
+  heartbeat
+```
 
 ## Health Statuses
 

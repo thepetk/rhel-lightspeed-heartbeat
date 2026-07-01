@@ -99,6 +99,8 @@ def _build_service_blocks(result: "HealthResult") -> "list[dict[str, Any]]":
             context_parts.append(f"Threshold: {result.service.response_time_threshold_ms:.0f}ms")
     if result.error_message:
         context_parts.append(f"Error: {result.error_message}")
+    if result.service.auth is not None:
+        context_parts.append(f"Auth: {result.service.auth.type}")
     context_parts.append(f"URL: {result.service.url}{result.service.health_path}")
 
     return [

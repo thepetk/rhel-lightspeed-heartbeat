@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
+from typing import Any
 
 
 class HealthStatus(Enum):
@@ -18,6 +19,14 @@ class AlertState(Enum):
 
 
 @dataclass(frozen=True)
+class AuthConfig:
+    type: "str"  # "mtls" or "saml_session"
+    cert_path: "str | None" = None  # mtls only
+    key_path: "str | None" = None  # mtls only
+    token_env_var: "str | None" = None  # saml_session only
+
+
+@dataclass(frozen=True)
 class ServiceConfig:
     name: "str"
     url: "str"
@@ -27,6 +36,10 @@ class ServiceConfig:
     response_time_threshold_ms: "float | None" = None
     retry_count: "int" = 5
     backoff_base_seconds: "float" = 1.0
+    method: "str" = "GET"
+    body: "dict[str, Any] | None" = None
+    proxy: "str | None" = None
+    auth: "AuthConfig | None" = None
 
 
 @dataclass(frozen=True)

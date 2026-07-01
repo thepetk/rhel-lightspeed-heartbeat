@@ -2,8 +2,8 @@ import httpx
 import pytest
 import respx
 
-from heartbeat.checker import HealthChecker
-from heartbeat.models import HealthStatus, ServiceConfig
+from heartbeat.checker import HealthChecker, _apply_auth, _build_client
+from heartbeat.models import AuthConfig, HealthStatus, ServiceConfig
 
 
 @pytest.fixture
@@ -216,3 +216,109 @@ async def test_check_healthy_within_threshold(service_with_threshold):
     # In real execution the response will be fast (mocked), well under 500ms
     assert result.status in (HealthStatus.HEALTHY, HealthStatus.DEGRADED)
     assert result.status_code == 200
+
+
+@respx.mock
+async def test_check_post_with_body():
+    svc = ServiceConfig(
+        name="svc",
+        url="https://api.example.com",
+        health_path="/infer",
+        method="POST",
+        body={"question": "What is SELinux?"},
+        retry_count=0,
+    )
+    route = respx.post("https://api.example.com/infer").mock(return_value=httpx.Response(200))
+    async with HealthChecker() as checker:
+        result = await checker.check(svc)
+    import json
+
+    assert result.status == HealthStatus.HEALTHY
+    assert route.called
+    assert json.loads(route.calls[0].request.content) == {"question": "What is SELinux?"}
+
+
+@respx.mock
+async def test_check_post_no_body():
+    svc = ServiceConfig(
+        name="svc",
+        url="https://api.example.com",
+        health_path="/healthz",
+        method="POST",
+        retry_count=0,
+    )
+    route = respx.post("https://api.example.com/healthz").mock(return_value=httpx.Response(200))
+    async with HealthChecker() as checker:
+        result = await checker.check(svc)
+    assert result.status == HealthStatus.HEALTHY
+    assert route.called
+
+
+def test_build_client_saml_session(monkeypatch):
+    monkeypatch.setenv("MY_SAML_TOKEN", "abc123")
+    svc = ServiceConfig(
+        name="svc",
+        url="https://example.com",
+        auth=AuthConfig(type="saml_session", token_env_var="MY_SAML_TOKEN"),
+    )
+    client = _build_client(svc)
+    assert client.cookies.get("session") == "abc123"
+
+
+def test_build_client_saml_session_missing_env_var(monkeypatch):
+    monkeypatch.delenv("MY_SAML_TOKEN", raising=False)
+    svc = ServiceConfig(
+        name="svc",
+        url="https://example.com",
+        auth=AuthConfig(type="saml_session", token_env_var="MY_SAML_TOKEN"),
+    )
+    with pytest.raises(ValueError, match="MY_SAML_TOKEN"):
+        _build_client(svc)
+
+
+@respx.mock
+async def test_check_with_saml_session_uses_custom_client(monkeypatch):
+    monkeypatch.setenv("MY_SAML_TOKEN", "tok")
+    svc = ServiceConfig(
+        name="svc",
+        url="https://example.com",
+        health_path="/healthz",
+        auth=AuthConfig(type="saml_session", token_env_var="MY_SAML_TOKEN"),
+        retry_count=0,
+    )
+    respx.get("https://example.com/healthz").mock(return_value=httpx.Response(200))
+    async with HealthChecker() as checker:
+        result = await checker.check(svc)
+    assert result.status == HealthStatus.HEALTHY
+
+
+def test_build_client_proxy():
+    svc = ServiceConfig(name="svc", url="https://example.com", proxy="http://proxy:3128")
+    client = _build_client(svc)
+    assert client is not None
+
+
+def test_apply_auth_mtls_sets_cert():
+    auth = AuthConfig(type="mtls", cert_path="/cert.pem", key_path="/key.pem")
+    kwargs: dict = {}
+    _apply_auth(kwargs, auth)
+    assert kwargs["cert"] == ("/cert.pem", "/key.pem")
+
+
+@respx.mock
+async def test_check_custom_client_retries_on_failure(monkeypatch, mock_asyncio_sleep):
+    monkeypatch.setenv("MY_SAML_TOKEN", "tok")
+    svc = ServiceConfig(
+        name="svc",
+        url="https://example.com",
+        health_path="/healthz",
+        auth=AuthConfig(type="saml_session", token_env_var="MY_SAML_TOKEN"),
+        retry_count=2,
+        backoff_base_seconds=1.0,
+    )
+    responses = iter([httpx.Response(503), httpx.Response(503), httpx.Response(200)])
+    respx.get("https://example.com/healthz").mock(side_effect=lambda _: next(responses))
+    async with HealthChecker() as checker:
+        result = await checker.check(svc)
+    assert result.status == HealthStatus.HEALTHY
+    assert mock_asyncio_sleep == [1.0, 2.0]
