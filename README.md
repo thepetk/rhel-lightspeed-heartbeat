@@ -108,6 +108,8 @@ Each service entry in the `services` sequence supports:
 
 `fail_on_unhealthy` causes a non-zero exit for any status that is not HEALTHY or DEGRADED. DEGRADED services emit a `::warning::` annotation but do not fail the action.
 
+Any non-HEALTHY result triggers the retry logic. The delay between attempts follows exponential backoff: `backoff_base_seconds × 2^attempt` (1 s, 2 s, 4 s, … with the default 1.0 s base). A Slack alert is only sent if all retries are exhausted and the service is still not healthy.
+
 ## Slack Alert Format
 
 When one or more services are not ok, the action posts a Slack message with:
