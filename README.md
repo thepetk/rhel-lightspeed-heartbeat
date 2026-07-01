@@ -74,14 +74,16 @@ uv run python -m heartbeat
 
 Each service entry in the `services` sequence supports:
 
-| Field                        | Required | Default      | Description                                            |
-| ---------------------------- | -------- | ------------ | ------------------------------------------------------ |
-| `name`                       | Yes      | —            | Display name for the service                           |
-| `url`                        | Yes      | —            | Base URL of the service (without the health path)      |
-| `health_path`                | No       | `"/healthz"` | Path to append to `url` for the health check request   |
-| `timeout_seconds`            | No       | `10.0`       | Per-service HTTP timeout in seconds                    |
-| `expected_status_codes`      | No       | `[200]`      | List of HTTP status codes that indicate healthy        |
-| `response_time_threshold_ms` | No       | omit         | If set, responses slower than this are marked DEGRADED |
+| Field                        | Required | Default      | Description                                                                      |
+| ---------------------------- | -------- | ------------ | -------------------------------------------------------------------------------- |
+| `name`                       | Yes      | —            | Display name for the service                                                     |
+| `url`                        | Yes      | —            | Base URL of the service (without the health path)                                |
+| `health_path`                | No       | `"/healthz"` | Path to append to `url` for the health check request                             |
+| `timeout_seconds`            | No       | `10.0`       | Per-service HTTP timeout in seconds                                              |
+| `expected_status_codes`      | No       | `[200]`      | List of HTTP status codes that indicate healthy                                  |
+| `response_time_threshold_ms` | No       | omit         | If set, responses slower than this are marked DEGRADED                           |
+| `retry_count`                | No       | global       | Per-service override for number of retries (defaults to `retry_count` input)     |
+| `backoff_base_seconds`       | No       | global       | Per-service override for backoff base delay (defaults to `backoff_base_seconds`) |
 
 ### Environment Variables (local use)
 
